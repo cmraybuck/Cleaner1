@@ -1,4 +1,5 @@
 import pandas as pd
+import sys  # {{ edit_1 }}
 
 def parse_config(config_file):
     """Parses the config file and extracts commands."""
@@ -69,8 +70,6 @@ def merge_files(config, csv_data):
     """Merges CSV files based on the provided configuration."""    
     merged_data = None
 
-
-
     for var_name, columns in config["add_columns"].items():
         file_info = config["files"][var_name]
         id_col = file_info["id_col"]
@@ -88,7 +87,15 @@ def merge_files(config, csv_data):
             if original not in rename_dict:  # Only rename if not already renamed
                 rename_dict[original] = new
         
-        file_data = csv_data[var_name][[id_col] + [col[0] for col in columns]]
+        # Handle both column names and indices
+        selected_columns = []
+        for col in columns:
+            if col[0].isdigit():  # Check if it's a number
+                selected_columns.append(csv_data[var_name].iloc[:, int(col[0])])  # Add by index
+            else:
+                selected_columns.append(csv_data[var_name][col[0]])  # Add by name
+        
+        file_data = pd.concat([csv_data[var_name][id_col]] + selected_columns, axis=1)
         
         # Rename columns dynamically
         file_data.rename(columns=rename_dict, inplace=True)
@@ -114,5 +121,5 @@ def main(config_file):
     merged_data.to_csv(config["output_file"], index=False)
 
 if __name__ == "__main__":
-    config_file_path = "config.cfg"  # Update this with the actual config file path
+    config_file_path = sys.argv[1] 
     main(config_file_path)
