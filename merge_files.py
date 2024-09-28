@@ -30,17 +30,30 @@ def parse_config(config_file):
                 config["delete_rows"][var_name] = rows
     return config
 
-def load_csv_files(file_configs):
-    """Loads the CSV files and stores them in a dictionary."""
+def load_csv_files(file_configs, config):
+    """Loads the CSV files and stores them in a dictionary."""    
     csv_data = {}
     
     for var_name, file_info in file_configs.items():
         csv_path = file_info["path"]
         id_col = file_info["id_col"]
-        csv_data[var_name] = pd.read_csv(csv_path)
-
         
-
+        # Load the CSV file without specifying header to handle extra rows
+        temp_data = pd.read_csv(csv_path, header=None)
+        
+        # Remove the specified rows dynamically
+        rows_to_delete = config["delete_rows"].get(var_name, [])
+        rows_to_delete = [int(row) for row in rows_to_delete]  # Convert to integers
+        temp_data = temp_data.drop(rows_to_delete, errors='ignore')  # Drop specified rows
+        
+        # Reset index after dropping rows
+        temp_data.reset_index(drop=True, inplace=True)
+        
+        # Set the first row as header
+        temp_data.columns = temp_data.iloc[0]  # Set the first row as header
+        temp_data = temp_data[1:]  # Remove the header row from the data
+        
+        csv_data[var_name] = temp_data
         
         # If ID column is specified as a number (index-based)
         if id_col and id_col.isdigit():
@@ -55,14 +68,8 @@ def load_csv_files(file_configs):
 def merge_files(config, csv_data):
     """Merges CSV files based on the provided configuration."""    
     merged_data = None
-    
-    # Corrected iteration over delete_rows
-    for var_name, rows_to_delete in config["delete_rows"].items():  
-        # Convert rows_to_delete from strings to integers
-        rows_to_delete = [int(row) for row in rows_to_delete]  # converts from string to int
-        # Ensure rows_to_delete are valid indices
-        valid_rows_to_delete = [row for row in rows_to_delete if row in csv_data[var_name].index]
-        csv_data[var_name] = csv_data[var_name].drop(valid_rows_to_delete)  # Use drop to remove rows
+
+
 
     for var_name, columns in config["add_columns"].items():
         file_info = config["files"][var_name]
@@ -98,7 +105,7 @@ def main(config_file):
     config = parse_config(config_file)
     
     # Load CSV files based on the configuration
-    csv_data = load_csv_files(config["files"])
+    csv_data = load_csv_files(config["files"], config)  # {{ edit_1 }}
     
     # Merge the files based on the configuration
     merged_data = merge_files(config, csv_data)
